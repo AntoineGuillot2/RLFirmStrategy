@@ -1,1 +1,1 @@
-# RLFirmStrategy
+# Reinforcement learning for firm strategy
