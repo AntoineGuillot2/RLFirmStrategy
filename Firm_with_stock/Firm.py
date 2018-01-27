@@ -156,11 +156,6 @@ class Firm:
     def compute_best_action2(self,observation):
         observation2=np.repeat(observation,len(self.possible_actions),0)
         values=[]
-        if self.n_step==99:
-            print("**************VECTOR*********************")
-            print(observation2[5])
-            print("**************LOOP*********************")
-            print(observation)
         values=self.estimate_Q(self.possible_actions,observation2)[:,0]
         return self.possible_actions[np.argmax(values)], np.max(values)
     
