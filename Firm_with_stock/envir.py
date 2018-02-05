@@ -44,7 +44,7 @@ class Environment:
         
 
     def observe(self):
-        return np.array([(0.,)])
+        return np.array([(self.price_memory[-1],)])
     
     def update_price(self,return_noise=True,save_price=True):
         price=self.price_evolution['average']+self.price_evolution['trend']*self.current_period

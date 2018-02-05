@@ -13,14 +13,14 @@ N_SIMU=300
 
 ###Environment parameters
 environment_params={}
-environment_params['price_evolution']={'average':0,'seasonal':10,'period':12,'random':2,'trend':0.01}
+environment_params['price_evolution']={'average':0,'seasonal':10,'period':24,'random':2,'trend':0.01}
 environment_params['n_firm']=1
 
 ###Firm parameters
 firm_params={}
 firm_params['initial_funds']=1000
 firm_params['replay_memory_size']=1000
-firm_params['memory_size']=20
+firm_params['memory_size']=12
 firm_params['plot_frequency']=10
 
 max_prod=20
@@ -42,6 +42,7 @@ firm_params['production_time']=4
 firm_params['initial_inventory']=10
 firm_params['max_inventory']=20
 firm_params['epochs']=10
+firm_params['epsilon_greedy']=False
 
 if __name__ == '__main__':
     envir_glob=Environment(environment_params,firm_params)
