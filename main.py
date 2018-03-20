@@ -13,20 +13,17 @@ N_SIMU=40
 
 ###Environment parameters
 environment_params={}
-environment_params['price_evolution']={'average':2,'seasonal':5,'period':12,'random':2,'trend':0.05}
+environment_params['price_evolution']={'average':2,'seasonal':5,'period':12,'random':0}
 environment_params['n_firm']=1
 
 ###Firm parameters
 firm_params={}
-firm_params['WACC']=1
+firm_params['WACC']=0.05
 firm_params['initial_funds']=1000
 firm_params['replay_memory_size']=1000
 firm_params['memory_size']=20
 firm_params['plot_frequency']=1
 firm_params['possible_actions']=np.array(range(20)).reshape(-1,1)
-firm_params['cost']=lambda x: 0.5*(x**2)
-firm_params['max_stock']=10
-firm_params['verbose']=0
 
 if __name__ == '__main__':
     envir_glob=Environment(environment_params,firm_params)
@@ -40,3 +37,6 @@ if __name__ == '__main__':
         print('OPTIMAL FUNDS KNOWING PRICE',1000+np.sum((opt_prod-0.5*np.floor(opt_prod))*np.floor(opt_prod)))
         print('OPTIMAL FUNDS NOT KNOWING PRICE',1000+np.sum((opt_prod-0.5*np.floor(opt_prod_no_noise))*np.floor(opt_prod_no_noise)))
         opt_prod=np.array(opt_prod)
+        plt.plot(opt_prod)
+        plt.plot(opt_prod_no_noise)
+        plt.show()

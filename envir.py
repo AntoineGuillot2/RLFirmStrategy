@@ -6,6 +6,7 @@ from Firm import Firm
 This file contains the definition of the environment
 in which the agents are run.
 """
+import matplotlib.pyplot as plt
 
 
 class Environment:
@@ -32,10 +33,11 @@ class Environment:
         self.price_memory=[0]
 
     def observe(self):
-        return np.array([(0.,)])
+        last_price=self.price_memory[-1]/10
+        return np.array(last_price).reshape(1,-1)
     
     def update_price(self,return_noise=True,save_price=True):
-        price=self.price_evolution['average']+self.price_evolution['trend']*self.current_period
+        price=self.price_evolution['average']
         price+=self.price_evolution['seasonal']*np.cos(2*3.14*self.current_period/self.price_evolution['period'])
         if return_noise:
             price+=np.random.normal(0,self.price_evolution['random'])

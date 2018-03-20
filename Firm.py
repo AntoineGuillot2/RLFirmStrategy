@@ -6,30 +6,27 @@ Created on Tue Jan 23 10:47:13 2018
 @author: antoine
 """
 import numpy as np
+import matplotlib.pyplot as plt
 from keras.models import Model
-from keras.layers import Input,Dense, Conv1D, MaxPooling1D, Concatenate, Flatten
+from keras.layers import Input,Dense
 
 
 class Firm:
     def __init__(self,params,observation_size=12):
-        print('NEW INIT')
         self.initial_funds=params['initial_funds']
-        self.last_action=0
         self.funds=self.initial_funds
-        self.stock=0
-        self.current_reward=0.
         self.WACC=params['WACC']
-        self.cost=params['cost']
         
         self.plot_frequency=params['plot_frequency']
         self.possible_actions=params['possible_actions']
         self.env_obs_size=observation_size
         self.memory_size=params['memory_size']
-        self.init_event_memory()
-        self.init_Q_estimator(observation_size)
+        self.init_memory()
+        self.init_Q_estimator(observation_size+self.state_observation().shape[1])
         
         self.replay_memory_size=params['replay_memory_size']
         self.init_replay_memory()
+
 
         
         self.played_games=0
@@ -37,80 +34,94 @@ class Firm:
         self.funds_evolution=[]
         self.list_actions=[]
 
-    def get_state(self):
-        return np.array([(self.funds/2000,self.stock/10,self.current_reward,self.last_action)])
+        
+    def state_observation(self):
+        return self.event_memory.reshape(1,-1)
         
         
     def init_Q_estimator(self,n_input):
-        self.Q_estimator_shape=(n_input,self.possible_actions.shape[1],1)
-        input_actions=Input(shape=(self.possible_actions.shape[1],))
-        x_actions = Dense(10,activation='relu')(input_actions)
-        input_data = Input(shape=(self.memory_size,n_input+self.get_state().shape[1],))
-        x_data = Conv1D(10,3)(input_data)
-        x_data = MaxPooling1D(3)(x_data)
-        x_data=Flatten()(x_data)
-        x=Concatenate()([x_data,x_actions])
-        x=Dense(10,activation='relu')(x)
+        self.Q_estimator_shape=(n_input+self.possible_actions.shape[1],1)
+        input_data = Input(shape=(n_input+self.possible_actions.shape[1],))
+        x = Dense(20,activation='relu')(input_data)
+        x = Dense(20,activation='relu')(x)
         estimated_Q = Dense(1,activation='linear')(x)
-        self.Q_estimator = Model(inputs=[input_actions,input_data], outputs=estimated_Q)
-        self.Q_estimator.compile(optimizer='nadam',
+        self.Q_estimator = Model(inputs=input_data, outputs=estimated_Q)
+        self.Q_estimator.compile(optimizer='rmsprop',
                       loss='mse')
 
-    ###Initialize the replay memory
+        
     def init_replay_memory(self):
-        self.action_memory=np.zeros((0,self.Q_estimator_shape[1]))
-        self.observation_memory=np.zeros((0,self.event_memory.shape[1],self.event_memory.shape[2]))
-        self.Q_memory=np.zeros((0,self.Q_estimator_shape[2]))
+        self.replay_memory=np.zeros((0,self.Q_estimator_shape[0]+1))
         
-    def update_replay_memory(self,action,state_observation,Q_value):
-        self.observation_memory=np.concatenate((self.observation_memory,state_observation),0)
-        self.action_memory=np.concatenate((self.action_memory,action),0)
-        Q_value=np.array([(Q_value,)])
-        self.Q_memory=np.concatenate((self.Q_memory,Q_value),0)
-        if np.shape(self.action_memory)[0]>self.replay_memory_size:
-            self.observation_memory=self.observation_memory[1:]
-            self.action_memory=self.action_memory[1:]
-            self.Q_memory=self.Q_memory[1:]
+    def update_replay_memory(self,new_observation):
+        self.replay_memory=np.concatenate((self.replay_memory,new_observation),0)
+        if np.shape(self.replay_memory)[0]>self.replay_memory_size:
+            self.replay_memory=self.replay_memory[1:]
         
-    def init_event_memory(self):
-        self.event_memory=np.zeros((1,self.memory_size,self.env_obs_size+self.get_state().shape[1]))
+    def init_memory(self):
+        self.event_memory=np.zeros((1,self.memory_size))
         
-    def update_event_memory(self,new_observation):
-        new_event_memory=np.concatenate((new_observation.reshape((1,1,-1)),self.event_memory),1)
-        self.event_memory=new_event_memory[:,:self.memory_size,:]
+    def update_memory(self,new_observation):
+        new_observation_size=new_observation.shape[0]
+        self.event_memory=np.concatenate((new_observation,self.event_memory.reshape(1,-1)),1)[0][:self.memory_size*new_observation_size]
+
+    def cost(self,quantity):
+        return 0.5*(quantity**2)
         
     def reset(self):
-        self.Q_estimator.fit([self.action_memory,self.observation_memory],self.Q_memory,epochs=200,verbose=0)
-        self.played_games+=1
-        
-        print(self.played_games)
+        print("GAME NUMBER: ", self.played_games)
+        print('*****FINAL FUNDS******')
         print(self.funds)
-        self.rewards=0
+        print(self.replay_memory)
+        self.Q_estimator.fit(self.replay_memory[:,:-1],self.replay_memory[:,-1],epochs=100+100*self.played_games,initial_epoch=100*self.played_games,verbose=0)
+        self.played_games+=1
+        if (self.played_games%self.plot_frequency)==0:
+            plt.plot(self.list_actions)
+            plt.title("Production Evolution")
+            
+        self.list_rewards=[]
+        self.funds_evolution=[]
+        self.list_actions=[]
         self.funds=self.initial_funds
-        self.init_event_memory()
+        self.init_memory()
+        pass
     
-    def compute_best_action(self,observation):
+    def compute_best_action2(self,observation):
         values=[]
         for action in self.possible_actions:
-            values+=[self.Q_estimator.predict([action,observation])[0][0]]
+            state_action=np.concatenate((observation.reshape(-1,1),action.reshape(-1,1)),0).reshape(1,-1)
+            values+=[self.Q_estimator.predict(state_action)[0][0]]
+        return self.possible_actions[np.argmax(values)], np.max(values)
+    
+    def compute_best_action(self,observation):
+        observation2=np.repeat(observation.reshape(-1,1),len(self.possible_actions),0)
+        values=[]
+        values=self.Q_estimator.predict(self.possible_actions.reshape(-1,1),observation2)
+        print(values)
         return self.possible_actions[np.argmax(values)], np.max(values)
 
     def act(self, observation):
-        state_observation=np.concatenate((self.get_state(),observation),1)
-        self.previous_observation=state_observation
-        self.update_event_memory(state_observation)
+        observation=observation.reshape((1,-1))
+        observation=np.concatenate((observation,self.state_observation()),1)
+        self.previous_observation=observation
         if (self.played_games<30):
             if np.random.uniform()<0.05:
                 random_action=np.random.randint(len(self.possible_actions))
-                action = self.possible_actions[random_action]
+                self.list_actions+=[self.possible_actions[random_action]]
             else:
-                action = self.compute_best_action(self.event_memory)[0]
+                self.list_actions+=[self.compute_best_action(observation)[0]]
         else:
-            action = self.compute_best_action(self.event_memory)[0]
-        self.last_action=action
-        return action
+            self.list_actions+=[self.compute_best_action(observation)[0]]
+        return self.list_actions[-1]
             
     def reward(self, observation, action, reward):
-        self.current_reward=reward/5
-        target=reward+(1-self.WACC)*self.compute_best_action(self.event_memory)[1]
-        self.update_replay_memory(action.reshape(1,-1),self.event_memory,target)
+        self.list_rewards+=[reward]
+        self.funds_evolution+=[self.funds]
+        observation=observation.reshape((1,-1))
+        observation=np.concatenate((observation,self.state_observation()),1)
+        target=reward+(1-self.WACC)*self.compute_best_action(observation)[1]
+        new_observation=np.concatenate((self.previous_observation.reshape(1,-1),action.reshape(1,-1),np.array([[target]])),1)
+        new_observation=new_observation.reshape((-1,self.Q_estimator_shape[0]+1))
+        self.update_replay_memory(new_observation)
+        self.update_memory(observation[:,:self.env_obs_size])
+        pass
